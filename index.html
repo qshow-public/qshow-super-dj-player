@@ -1,0 +1,1898 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Q'SHOW — DJ Player</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --neon-blue: #00d4ff;
+    --neon-green: #39ff14;
+    --neon-purple: #bf00ff;
+    --neon-red: #ff003c;
+    --neon-orange: #ff6a00;
+    --neon-pink: #ff00aa;
+    --bg-deep: #020408;
+    --bg-card: rgba(5,12,22,0.92);
+    --bg-panel: rgba(8,18,32,0.95);
+    --text-main: #e0f0ff;
+    --text-dim: #556677;
+    --glow-blue: 0 0 8px #00d4ff, 0 0 20px #00d4ff55, 0 0 40px #00d4ff22;
+    --glow-green: 0 0 8px #39ff14, 0 0 20px #39ff1455, 0 0 40px #39ff1422;
+    --glow-purple: 0 0 8px #bf00ff, 0 0 20px #bf00ff55, 0 0 40px #bf00ff22;
+    --glow-red: 0 0 8px #ff003c, 0 0 20px #ff003c55;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-deep);
+    color: var(--text-main);
+    font-family: 'Rajdhani', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* ─── FESTIVAL BACKGROUND ─── */
+  #bg-canvas {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* ─── LAYOUT ─── */
+  .app {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  /* ─── HEADER ─── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: var(--bg-panel);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-radius: 12px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 0 30px rgba(0,212,255,0.08), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .logo {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: 28px;
+    letter-spacing: 4px;
+    background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple), var(--neon-blue));
+    background-size: 200% auto;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 3s linear infinite;
+    text-shadow: none;
+  }
+
+  @keyframes shimmer { to { background-position: 200% center; } }
+
+  .live-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255,0,60,0.15);
+    border: 1px solid var(--neon-red);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--neon-red);
+    box-shadow: var(--glow-red);
+  }
+
+  .live-dot {
+    width: 8px; height: 8px;
+    background: var(--neon-red);
+    border-radius: 50%;
+    animation: pulse-dot 1s ease-in-out infinite;
+    box-shadow: var(--glow-red);
+  }
+
+  @keyframes pulse-dot {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.7); }
+  }
+
+  .header-time {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 20px;
+    color: var(--neon-green);
+    text-shadow: var(--glow-green);
+    letter-spacing: 2px;
+  }
+
+  /* ─── VISUALIZER ─── */
+  .visualizer-wrap {
+    background: var(--bg-panel);
+    border: 1px solid rgba(0,212,255,0.15);
+    border-radius: 12px;
+    padding: 12px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .visualizer-label {
+    position: absolute;
+    top: 8px;
+    left: 16px;
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--neon-blue);
+    opacity: 0.7;
+  }
+
+  #viz-canvas {
+    width: 100%;
+    height: 90px;
+    display: block;
+  }
+
+  /* ─── DECKS AREA ─── */
+  .decks-area {
+    display: grid;
+    grid-template-columns: 1fr 320px 1fr;
+    gap: 10px;
+    flex: 1;
+  }
+
+  /* ─── DECK PANEL ─── */
+  .deck {
+    background: var(--bg-panel);
+    border-radius: 16px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(0,212,255,0.1);
+    box-shadow: inset 0 0 40px rgba(0,0,0,0.5);
+  }
+
+  .deck::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(0,212,255,0.05) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .deck-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--neon-blue);
+    text-shadow: var(--glow-blue);
+    width: 100%;
+    text-align: center;
+  }
+
+  /* ─── TURNTABLE ─── */
+  .turntable-wrap {
+    position: relative;
+    width: 220px;
+    height: 220px;
+  }
+
+  .turntable-base {
+    position: absolute;
+    inset: -10px;
+    background: radial-gradient(circle, #1a1a2e 60%, #0a0a14);
+    border-radius: 50%;
+    border: 3px solid rgba(0,212,255,0.15);
+    box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 20px rgba(0,0,0,0.5);
+  }
+
+  .vinyl {
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    position: relative;
+    animation: spin 2s linear infinite;
+    animation-play-state: paused;
+    will-change: transform;
+    cursor: grab;
+  }
+
+  .vinyl:active { cursor: grabbing; }
+
+  .vinyl-inner {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background:
+      radial-gradient(circle at 50% 50%, #2a0a4a 0%, #0d0d1a 12%, transparent 12.5%),
+      conic-gradient(
+        from 0deg,
+        #111 0deg 2deg, #1a1a1a 2deg 4deg, #111 4deg 6deg, #1a1a1a 6deg 8deg,
+        #111 8deg 10deg, #1a1a1a 10deg 12deg, #111 12deg 14deg, #1a1a1a 14deg 16deg,
+        #111 16deg 18deg, #1a1a1a 18deg 20deg, #111 20deg 22deg, #1a1a1a 22deg 24deg,
+        #111 24deg 26deg, #1a1a1a 26deg 28deg, #111 28deg 30deg, #1a1a1a 30deg 32deg,
+        #111 32deg 34deg, #1a1a1a 34deg 36deg, #111 36deg 38deg, #1a1a1a 38deg 40deg,
+        #111 40deg 42deg, #1a1a1a 42deg 44deg, #111 44deg 46deg, #1a1a1a 46deg 48deg,
+        #111 48deg 50deg, #1a1a1a 50deg 52deg, #111 52deg 54deg, #1a1a1a 54deg 56deg,
+        #111 56deg 58deg, #1a1a1a 58deg 60deg, #111 60deg 62deg, #1a1a1a 62deg 64deg,
+        #111 64deg 66deg, #1a1a1a 66deg 68deg, #111 68deg 70deg, #1a1a1a 70deg 72deg,
+        #111 72deg 360deg
+      );
+    position: relative;
+    overflow: hidden;
+  }
+
+  .vinyl-grooves {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background:
+      repeating-radial-gradient(
+        circle at 50%,
+        transparent 0px,
+        transparent 3px,
+        rgba(255,255,255,0.03) 3px,
+        rgba(255,255,255,0.03) 4px
+      );
+  }
+
+  .vinyl-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: radial-gradient(circle, #1a004a, #0d0020);
+    border: 2px solid rgba(191,0,255,0.4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 15px rgba(191,0,255,0.5), inset 0 0 10px rgba(0,0,0,0.5);
+    overflow: hidden;
+  }
+
+  .vinyl-label-text {
+    font-family: 'Orbitron', monospace;
+    font-size: 7px;
+    font-weight: 900;
+    color: var(--neon-purple);
+    letter-spacing: 1px;
+    text-shadow: 0 0 6px var(--neon-purple);
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  .vinyl-hole {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #000;
+    border: 1px solid rgba(255,255,255,0.1);
+    z-index: 2;
+  }
+
+  .vinyl-shine {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(
+      from 200deg,
+      transparent 0deg,
+      rgba(255,255,255,0.06) 30deg,
+      transparent 60deg,
+      transparent 360deg
+    );
+    pointer-events: none;
+    animation: vinyl-shine 2s linear infinite;
+    animation-play-state: paused;
+  }
+
+  @keyframes vinyl-shine { to { transform: rotate(360deg); } }
+
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  /* Tonearm */
+  .tonearm-wrap {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    width: 80px;
+    height: 130px;
+    pointer-events: none;
+    z-index: 10;
+    transform-origin: 60px 15px;
+    transition: transform 1.2s cubic-bezier(0.25,0.46,0.45,0.94);
+  }
+
+  .tonearm-svg { width: 80px; height: 130px; }
+
+  /* ─── DECK CONTROLS ─── */
+  .deck-controls {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .btn {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.05);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .btn:hover::before { opacity: 1; }
+  .btn:active { transform: scale(0.95); }
+
+  .btn-play {
+    background: rgba(57,255,20,0.1);
+    border-color: var(--neon-green);
+    color: var(--neon-green);
+    box-shadow: 0 0 10px rgba(57,255,20,0.2);
+  }
+
+  .btn-play:hover, .btn-play.active {
+    background: rgba(57,255,20,0.2);
+    box-shadow: var(--glow-green);
+  }
+
+  .btn-stop {
+    background: rgba(255,0,60,0.1);
+    border-color: var(--neon-red);
+    color: var(--neon-red);
+    box-shadow: 0 0 10px rgba(255,0,60,0.2);
+  }
+
+  .btn-stop:hover {
+    background: rgba(255,0,60,0.2);
+    box-shadow: var(--glow-red);
+  }
+
+  .btn-pause {
+    background: rgba(0,212,255,0.1);
+    border-color: var(--neon-blue);
+    color: var(--neon-blue);
+    box-shadow: 0 0 10px rgba(0,212,255,0.2);
+  }
+
+  .btn-pause:hover, .btn-pause.active {
+    background: rgba(0,212,255,0.2);
+    box-shadow: var(--glow-blue);
+  }
+
+  /* BPM / pitch indicator */
+  .bpm-display {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--neon-orange);
+    text-shadow: 0 0 8px var(--neon-orange);
+    text-align: center;
+    letter-spacing: 2px;
+  }
+
+  /* ─── VU METERS ─── */
+  .vu-meters {
+    display: flex;
+    gap: 4px;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .vu-bar-wrap {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 2px;
+    height: 70px;
+    width: 8px;
+  }
+
+  .vu-seg {
+    flex: 1;
+    border-radius: 1px;
+    background: rgba(255,255,255,0.05);
+    transition: background 0.05s;
+  }
+
+  /* ─── MIXER CENTER ─── */
+  .mixer {
+    background: var(--bg-panel);
+    border-radius: 16px;
+    border: 1px solid rgba(191,0,255,0.2);
+    padding: 14px 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 0 30px rgba(191,0,255,0.05), inset 0 0 30px rgba(0,0,0,0.4);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mixer::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(191,0,255,0.08) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  .mixer-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 4px;
+    color: var(--neon-purple);
+    text-shadow: var(--glow-purple);
+  }
+
+  /* Crossfader */
+  .crossfader-section {
+    width: 100%;
+  }
+
+  .crossfader-label {
+    font-size: 10px;
+    font-family: 'Orbitron', monospace;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-align: center;
+    margin-bottom: 6px;
+  }
+
+  .crossfader-track {
+    position: relative;
+    height: 28px;
+    background: linear-gradient(90deg, rgba(0,212,255,0.15) 0%, rgba(191,0,255,0.15) 100%);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    padding: 0 4px;
+    cursor: pointer;
+  }
+
+  .crossfader-fill {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    border-radius: 14px;
+    background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple));
+    opacity: 0.3;
+    width: 50%;
+    pointer-events: none;
+    transition: width 0.05s;
+  }
+
+  .crossfader-thumb {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 24px;
+    height: 36px;
+    background: linear-gradient(180deg, #3a3a5c, #1a1a2e);
+    border: 1px solid rgba(191,0,255,0.5);
+    border-radius: 6px;
+    cursor: grab;
+    box-shadow: 0 0 10px rgba(191,0,255,0.3);
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    transition: box-shadow 0.2s;
+  }
+
+  .crossfader-thumb:active { cursor: grabbing; }
+  .crossfader-thumb:hover { box-shadow: 0 0 16px rgba(191,0,255,0.5); }
+
+  .cf-line {
+    width: 14px;
+    height: 1px;
+    background: rgba(191,0,255,0.6);
+    border-radius: 1px;
+  }
+
+  .crossfader-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    letter-spacing: 2px;
+  }
+
+  /* Volume knob */
+  .volume-section { width: 100%; }
+
+  .knob-row {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .knob-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .knob-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 8px;
+    letter-spacing: 2px;
+    color: var(--text-dim);
+  }
+
+  .knob {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #3a3a5c, #0d0d1a);
+    border: 2px solid rgba(0,212,255,0.3);
+    position: relative;
+    cursor: ns-resize;
+    box-shadow: 0 0 12px rgba(0,212,255,0.15), inset 0 2px 4px rgba(255,255,255,0.05);
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .knob:hover {
+    border-color: var(--neon-blue);
+    box-shadow: var(--glow-blue);
+  }
+
+  .knob-dot {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: var(--neon-blue);
+    border-radius: 50%;
+    top: 6px;
+    left: 50%;
+    transform: translateX(-50%);
+    box-shadow: var(--glow-blue);
+    transition: background 0.2s;
+  }
+
+  .knob-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--neon-blue);
+    letter-spacing: 1px;
+  }
+
+  /* EQ Faders */
+  .eq-section { width: 100%; }
+
+  .eq-faders {
+    display: flex;
+    justify-content: space-around;
+    gap: 6px;
+    align-items: flex-end;
+  }
+
+  .fader-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .fader-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 7px;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+
+  .fader-track {
+    width: 14px;
+    height: 80px;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 7px;
+    position: relative;
+    cursor: pointer;
+    overflow: visible;
+  }
+
+  .fader-fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: linear-gradient(0deg, var(--neon-blue), var(--neon-purple));
+    border-radius: 7px;
+    opacity: 0.4;
+    height: 50%;
+    pointer-events: none;
+    transition: height 0.1s;
+  }
+
+  .fader-thumb {
+    position: absolute;
+    left: 50%;
+    bottom: 50%;
+    transform: translate(-50%, 50%);
+    width: 22px;
+    height: 14px;
+    background: linear-gradient(180deg, #3a3a5c, #1a1a2e);
+    border: 1px solid rgba(0,212,255,0.4);
+    border-radius: 4px;
+    cursor: ns-resize;
+    z-index: 2;
+    box-shadow: 0 0 6px rgba(0,212,255,0.2);
+    transition: border-color 0.2s;
+  }
+
+  .fader-thumb:hover { border-color: var(--neon-blue); }
+
+  /* LED strip */
+  .led-strip {
+    display: flex;
+    gap: 3px;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .led {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+    transition: background 0.05s, box-shadow 0.05s;
+  }
+
+  /* Station info */
+  .station-info {
+    width: 100%;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(0,212,255,0.1);
+    border-radius: 8px;
+    padding: 8px 12px;
+    text-align: center;
+  }
+
+  .station-name {
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    color: var(--neon-blue);
+    text-shadow: var(--glow-blue);
+  }
+
+  .station-url {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 2px;
+    letter-spacing: 1px;
+  }
+
+  /* Master play button */
+  .master-play {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    border: none;
+    background: radial-gradient(circle at 35% 35%, rgba(57,255,20,0.3), rgba(0,80,0,0.6));
+    border: 2px solid var(--neon-green);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    box-shadow: var(--glow-green), 0 0 30px rgba(57,255,20,0.1);
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .master-play::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    background: conic-gradient(var(--neon-green) 0deg, transparent 60deg, transparent 360deg);
+    animation: spin 3s linear infinite;
+    opacity: 0.3;
+    z-index: -1;
+  }
+
+  .master-play:hover {
+    box-shadow: 0 0 20px var(--neon-green), 0 0 40px rgba(57,255,20,0.3);
+    transform: scale(1.05);
+  }
+
+  .master-play.playing {
+    background: radial-gradient(circle at 35% 35%, rgba(255,0,60,0.3), rgba(80,0,0,0.6));
+    border-color: var(--neon-red);
+    box-shadow: var(--glow-red);
+  }
+
+  /* Volume master */
+  .vol-master {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .vol-label {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+  }
+
+  .vol-slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    border-radius: 3px;
+    background: rgba(255,255,255,0.08);
+    outline: none;
+    cursor: pointer;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .vol-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, var(--neon-blue), #003a5c);
+    border: 1px solid var(--neon-blue);
+    box-shadow: var(--glow-blue);
+    cursor: grab;
+    transition: box-shadow 0.2s;
+  }
+
+  .vol-slider::-webkit-slider-thumb:hover {
+    box-shadow: 0 0 16px var(--neon-blue), 0 0 30px rgba(0,212,255,0.4);
+  }
+
+  /* ─── LED BARS (side lamps) ─── */
+  .led-bars {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    width: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 20px 0;
+    z-index: 2;
+  }
+
+  .led-bars.left { left: 0; }
+  .led-bars.right { right: 0; }
+
+  .led-bar-seg {
+    flex: 1;
+    border-radius: 2px;
+    opacity: 0.4;
+    transition: opacity 0.05s, background 0.1s;
+  }
+
+  /* ─── MINI PLAYER ─── */
+  .mini-player {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 100;
+    background: rgba(5,12,22,0.95);
+    border: 1px solid rgba(0,212,255,0.3);
+    border-radius: 16px;
+    padding: 12px 16px;
+    backdrop-filter: blur(20px);
+    box-shadow: 0 0 30px rgba(0,0,0,0.6), 0 0 20px rgba(0,212,255,0.1);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 220px;
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .mini-player:hover {
+    border-color: var(--neon-blue);
+    box-shadow: 0 0 30px rgba(0,0,0,0.6), var(--glow-blue);
+  }
+
+  .mini-vinyl {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 35%, #2a0a4a, #0d0d1a);
+    border: 2px solid rgba(191,0,255,0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: spin 2s linear infinite;
+    animation-play-state: paused;
+    flex-shrink: 0;
+  }
+
+  .mini-vinyl-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #000;
+    border: 1px solid rgba(255,255,255,0.2);
+  }
+
+  .mini-info { flex: 1; min-width: 0; }
+
+  .mini-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    color: var(--neon-blue);
+    letter-spacing: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .mini-status {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .mini-toggle {
+    font-size: 16px;
+    cursor: pointer;
+    background: none;
+    border: none;
+    color: var(--neon-green);
+    text-shadow: var(--glow-green);
+    padding: 4px;
+    transition: transform 0.2s;
+  }
+
+  .mini-toggle:hover { transform: scale(1.2); }
+
+  /* ─── STATUS BAR ─── */
+  .status-bar {
+    background: var(--bg-panel);
+    border: 1px solid rgba(0,212,255,0.1);
+    border-radius: 10px;
+    padding: 8px 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .status-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--neon-green);
+    box-shadow: var(--glow-green);
+    animation: pulse-dot 1.5s ease-in-out infinite;
+  }
+
+  .status-dot.red {
+    background: var(--neon-red);
+    box-shadow: var(--glow-red);
+  }
+
+  .ticker-wrap {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .ticker {
+    display: inline-block;
+    white-space: nowrap;
+    animation: ticker 20s linear infinite;
+    color: var(--neon-green);
+    letter-spacing: 2px;
+  }
+
+  @keyframes ticker {
+    from { transform: translateX(100%); }
+    to { transform: translateX(-100%); }
+  }
+
+  /* ─── RESPONSIVE ─── */
+  @media (max-width: 900px) {
+    .decks-area {
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto auto;
+    }
+
+    .mixer { order: -1; flex-direction: row; flex-wrap: wrap; justify-content: space-between; }
+    .turntable-wrap { width: 160px; height: 160px; }
+    .vinyl { width: 160px; height: 160px; }
+    .led-bars { display: none; }
+    .mini-player { bottom: 8px; right: 8px; min-width: 180px; }
+  }
+
+  @media (max-width: 600px) {
+    .logo { font-size: 20px; }
+    .header-time { font-size: 16px; }
+    .turntable-wrap { width: 130px; height: 130px; }
+    .vinyl { width: 130px; height: 130px; }
+    .tonearm-wrap { width: 60px; height: 100px; }
+  }
+
+  /* Glow animation for active state */
+  @keyframes glow-pulse {
+    0%,100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  .active-glow { animation: glow-pulse 1s ease-in-out infinite; }
+</style>
+</head>
+<body>
+
+<!-- LED BARS -->
+<div class="led-bars left" id="ledLeft"></div>
+<div class="led-bars right" id="ledRight"></div>
+
+<!-- FESTIVAL BACKGROUND CANVAS -->
+<canvas id="bg-canvas"></canvas>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="logo">Q'SHOW</div>
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      AO VIVO
+    </div>
+    <div class="header-time" id="clock">00:00:00</div>
+  </header>
+
+  <!-- VISUALIZER -->
+  <div class="visualizer-wrap">
+    <div class="visualizer-label">AUDIO SPECTRUM ANALYZER</div>
+    <canvas id="viz-canvas"></canvas>
+  </div>
+
+  <!-- DECKS AREA -->
+  <div class="decks-area">
+
+    <!-- DECK A -->
+    <div class="deck" id="deckA">
+      <div class="deck-label">◈ DECK A ◈</div>
+
+      <div class="turntable-wrap">
+        <div class="turntable-base"></div>
+        <div class="vinyl" id="vinylA">
+          <div class="vinyl-inner">
+            <div class="vinyl-grooves"></div>
+            <div class="vinyl-shine" id="shineA"></div>
+            <div class="vinyl-label">
+              <div class="vinyl-label-text">Q'SHOW<br>LIVE</div>
+            </div>
+            <div class="vinyl-hole"></div>
+          </div>
+        </div>
+        <!-- Tonearm -->
+        <div class="tonearm-wrap" id="tonearmA">
+          <svg class="tonearm-svg" viewBox="0 0 80 130">
+            <circle cx="62" cy="14" r="9" fill="#1a1a2e" stroke="rgba(0,212,255,0.4)" stroke-width="1.5"/>
+            <circle cx="62" cy="14" r="4" fill="rgba(0,212,255,0.6)"/>
+            <line x1="62" y1="23" x2="30" y2="100" stroke="rgba(0,212,255,0.7)" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="30" y1="100" x2="20" y2="112" stroke="rgba(0,212,255,0.7)" stroke-width="2.5" stroke-linecap="round"/>
+            <rect x="15" y="110" width="12" height="8" rx="2" fill="#1a1a2e" stroke="rgba(0,212,255,0.4)" stroke-width="1"/>
+            <rect x="16" y="118" width="10" height="4" rx="1" fill="rgba(0,212,255,0.3)"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="bpm-display" id="bpmA">BPM: ---</div>
+
+      <!-- VU Meters -->
+      <div class="vu-meters" id="vuA"></div>
+
+      <div class="deck-controls">
+        <button class="btn btn-play" onclick="deckPlay('A')">▶ PLAY</button>
+        <button class="btn btn-pause" onclick="deckPause('A')">⏸</button>
+        <button class="btn btn-stop" onclick="deckStop('A')">⏹</button>
+      </div>
+    </div>
+
+    <!-- MIXER -->
+    <div class="mixer">
+      <div class="mixer-title">▼ MIXER ▼</div>
+
+      <!-- LED strip top -->
+      <div class="led-strip" id="ledStrip"></div>
+
+      <!-- Station Info -->
+      <div class="station-info">
+        <div class="station-name">Q'SHOW</div>
+        <div class="station-url">svrdedicado.org:7105/stream</div>
+      </div>
+
+      <!-- Master Play -->
+      <button class="master-play" id="masterPlayBtn" onclick="toggleMaster()">▶</button>
+
+      <!-- Volume Master -->
+      <div class="vol-master">
+        <div class="vol-label">
+          <span>VOLUME</span>
+          <span id="volVal">80%</span>
+        </div>
+        <input type="range" class="vol-slider" id="volSlider" min="0" max="100" value="80" oninput="setVolume(this.value)">
+      </div>
+
+      <!-- EQ Faders -->
+      <div class="eq-section">
+        <div class="crossfader-label">EQUALIZER</div>
+        <div class="eq-faders">
+          <div class="fader-wrap">
+            <div class="fader-label">HI</div>
+            <div class="fader-track" id="faderHi">
+              <div class="fader-fill"></div>
+              <div class="fader-thumb"></div>
+            </div>
+          </div>
+          <div class="fader-wrap">
+            <div class="fader-label">MID</div>
+            <div class="fader-track" id="faderMid">
+              <div class="fader-fill"></div>
+              <div class="fader-thumb"></div>
+            </div>
+          </div>
+          <div class="fader-wrap">
+            <div class="fader-label">LO</div>
+            <div class="fader-track" id="faderLo">
+              <div class="fader-fill"></div>
+              <div class="fader-thumb"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Knobs -->
+      <div class="knob-row">
+        <div class="knob-wrap">
+          <div class="knob-label">BASS</div>
+          <div class="knob" id="knobBass" data-val="50">
+            <div class="knob-dot" style="transform-origin: 50% 400%; transform: translateX(-50%) rotate(-30deg);"></div>
+          </div>
+          <div class="knob-value">50%</div>
+        </div>
+        <div class="knob-wrap">
+          <div class="knob-label">GAIN</div>
+          <div class="knob" id="knobGain" data-val="70" style="border-color: rgba(191,0,255,0.3);">
+            <div class="knob-dot" style="background: var(--neon-purple); box-shadow: var(--glow-purple); transform-origin: 50% 400%; transform: translateX(-50%) rotate(24deg);"></div>
+          </div>
+          <div class="knob-value">70%</div>
+        </div>
+      </div>
+
+      <!-- Crossfader -->
+      <div class="crossfader-section">
+        <div class="crossfader-label">CROSSFADER</div>
+        <div class="crossfader-track" id="crossfaderTrack">
+          <div class="crossfader-fill" id="crossfaderFill"></div>
+          <div class="crossfader-thumb" id="crossfaderThumb">
+            <div class="cf-line"></div>
+            <div class="cf-line"></div>
+            <div class="cf-line"></div>
+          </div>
+        </div>
+        <div class="crossfader-labels">
+          <span>A</span>
+          <span>CENTER</span>
+          <span>B</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- DECK B -->
+    <div class="deck" id="deckB">
+      <div class="deck-label">◈ DECK B ◈</div>
+
+      <div class="turntable-wrap">
+        <div class="turntable-base"></div>
+        <div class="vinyl" id="vinylB">
+          <div class="vinyl-inner">
+            <div class="vinyl-grooves"></div>
+            <div class="vinyl-shine" id="shineB"></div>
+            <div class="vinyl-label">
+              <div class="vinyl-label-text">Q'SHOW<br>MIX</div>
+            </div>
+            <div class="vinyl-hole"></div>
+          </div>
+        </div>
+        <!-- Tonearm B -->
+        <div class="tonearm-wrap" id="tonearmB">
+          <svg class="tonearm-svg" viewBox="0 0 80 130">
+            <circle cx="62" cy="14" r="9" fill="#1a1a2e" stroke="rgba(191,0,255,0.4)" stroke-width="1.5"/>
+            <circle cx="62" cy="14" r="4" fill="rgba(191,0,255,0.6)"/>
+            <line x1="62" y1="23" x2="30" y2="100" stroke="rgba(191,0,255,0.7)" stroke-width="2.5" stroke-linecap="round"/>
+            <line x1="30" y1="100" x2="20" y2="112" stroke="rgba(191,0,255,0.7)" stroke-width="2.5" stroke-linecap="round"/>
+            <rect x="15" y="110" width="12" height="8" rx="2" fill="#1a1a2e" stroke="rgba(191,0,255,0.4)" stroke-width="1"/>
+            <rect x="16" y="118" width="10" height="4" rx="1" fill="rgba(191,0,255,0.3)"/>
+          </svg>
+        </div>
+      </div>
+
+      <div class="bpm-display" id="bpmB">BPM: ---</div>
+
+      <!-- VU Meters -->
+      <div class="vu-meters" id="vuB"></div>
+
+      <div class="deck-controls">
+        <button class="btn btn-play" onclick="deckPlay('B')">▶ PLAY</button>
+        <button class="btn btn-pause" onclick="deckPause('B')">⏸</button>
+        <button class="btn btn-stop" onclick="deckStop('B')">⏹</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="status-bar">
+    <div class="status-item">
+      <div class="status-dot red" id="connDot"></div>
+      <span id="connStatus">DESCONECTADO</span>
+    </div>
+    <div class="status-item">
+      <div class="status-dot"></div>
+      <span>STREAM: 128kbps</span>
+    </div>
+    <div class="ticker-wrap">
+      <div class="ticker">Q'SHOW - AO VIVO ⚡ Transmissão em tempo real ⚡ Uma Festa Todo Dia! ⚡ Q'SHOW! Tecnologia que conecta, soluções que transformam!</div>
+    </div>
+    <div class="status-item">
+      <span id="audioState">AGUARDANDO</span>
+    </div>
+  </div>
+
+</div>
+
+
+
+<!-- AUDIO -->
+<audio id="audioPlayer" crossorigin="anonymous" preload="none"></audio>
+
+<script>
+// ─── STATE ───
+const STREAM_URL = 'https://stream2.svrdedicado.org:7105/stream';
+let isPlaying = false;
+let audioCtx = null;
+let analyser = null;
+let source = null;
+let dataArray = null;
+let animFrame = null;
+
+// Spin speeds
+let spinSpeedA = 0, spinSpeedB = 0;
+let targetSpeedA = 0, targetSpeedB = 0;
+let rotA = 0, rotB = 0;
+let lastTime = 0;
+
+const audio = document.getElementById('audioPlayer');
+const masterBtn = document.getElementById('masterPlayBtn');
+
+// ─── CLOCK ───
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    String(now.getHours()).padStart(2,'0') + ':' +
+    String(now.getMinutes()).padStart(2,'0') + ':' +
+    String(now.getSeconds()).padStart(2,'0');
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ─── BUILD VU METERS ───
+function buildVU(id, count = 12) {
+  const el = document.getElementById(id);
+  const colors = ['#39ff14','#39ff14','#39ff14','#39ff14','#ffdd00','#ffdd00','#ffdd00','#ff8800','#ff4400','#ff003c','#ff003c','#ff003c'];
+  for (let ch = 0; ch < 2; ch++) {
+    const wrap = document.createElement('div');
+    wrap.className = 'vu-bar-wrap';
+    for (let i = 0; i < count; i++) {
+      const seg = document.createElement('div');
+      seg.className = 'vu-seg';
+      seg.dataset.idx = i;
+      seg.dataset.color = colors[i];
+      wrap.appendChild(seg);
+    }
+    el.appendChild(wrap);
+  }
+}
+buildVU('vuA'); buildVU('vuB');
+
+// ─── LED STRIP ───
+function buildLEDStrip() {
+  const strip = document.getElementById('ledStrip');
+  const colors = [
+    '#ff003c','#ff4400','#ff8800','#ffdd00','#39ff14',
+    '#00d4ff','#bf00ff','#ff00aa','#00d4ff','#39ff14',
+    '#ffdd00','#ff8800','#ff4400','#ff003c'
+  ];
+  colors.forEach(c => {
+    const led = document.createElement('div');
+    led.className = 'led';
+    led.dataset.color = c;
+    strip.appendChild(led);
+  });
+}
+buildLEDStrip();
+
+// ─── LED SIDE BARS ───
+function buildLEDBars() {
+  const lColors = ['#00d4ff','#bf00ff','#39ff14','#ff003c','#00d4ff','#bf00ff','#39ff14','#ff003c'];
+  ['ledLeft','ledRight'].forEach((id, si) => {
+    const el = document.getElementById(id);
+    for (let i = 0; i < 24; i++) {
+      const seg = document.createElement('div');
+      seg.className = 'led-bar-seg';
+      seg.style.background = lColors[(i + si * 4) % lColors.length];
+      el.appendChild(seg);
+    }
+  });
+}
+buildLEDBars();
+
+// ─── AUDIO NODES ───
+let gainMaster = null;  // volume slider
+let gainNode   = null;  // GAIN knob
+let bassFilter = null;  // Bass knob  — low shelf 200 Hz
+let filterHi   = null;  // EQ Hi      — high shelf 3.2 kHz
+let filterMid  = null;  // EQ Mid     — peaking 1 kHz
+let filterLo   = null;  // EQ Lo      — low shelf 320 Hz
+let cfGain     = null;  // crossfader gain
+
+// ─── AUDIO CONTEXT SETUP ───
+// Chain: source → bassFilter → filterLo → filterMid → filterHi → gainNode → cfGain → gainMaster → analyser → destination
+function setupAudio() {
+  if (audioCtx) return;
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = 256;
+  analyser.smoothingTimeConstant = 0.8;
+  dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+  gainMaster = audioCtx.createGain();
+  gainMaster.gain.value = document.getElementById('volSlider').value / 100;
+
+  gainNode = audioCtx.createGain();
+  gainNode.gain.value = 0.7;
+
+  cfGain = audioCtx.createGain();
+  cfGain.gain.value = 1.0;
+
+  bassFilter = audioCtx.createBiquadFilter();
+  bassFilter.type = 'lowshelf';
+  bassFilter.frequency.value = 200;
+  bassFilter.gain.value = 0;
+
+  filterLo = audioCtx.createBiquadFilter();
+  filterLo.type = 'lowshelf';
+  filterLo.frequency.value = 320;
+  filterLo.gain.value = 0;
+
+  filterMid = audioCtx.createBiquadFilter();
+  filterMid.type = 'peaking';
+  filterMid.frequency.value = 1000;
+  filterMid.Q.value = 1.0;
+  filterMid.gain.value = 0;
+
+  filterHi = audioCtx.createBiquadFilter();
+  filterHi.type = 'highshelf';
+  filterHi.frequency.value = 3200;
+  filterHi.gain.value = 0;
+
+  source = audioCtx.createMediaElementSource(audio);
+  source
+    .connect(bassFilter)
+    .connect(filterLo)
+    .connect(filterMid)
+    .connect(filterHi)
+    .connect(gainNode)
+    .connect(cfGain)
+    .connect(gainMaster)
+    .connect(analyser)
+    .connect(audioCtx.destination);
+}
+
+// ─── MASTER PLAY / PAUSE ───
+function toggleMaster() {
+  if (!isPlaying) {
+    startPlay();
+  } else {
+    stopPlay();
+  }
+}
+
+function startPlay() {
+  try { setupAudio(); } catch(e) {}
+  audio.src = STREAM_URL + '?nocache=' + Date.now();
+  audio.volume = document.getElementById('volSlider').value / 100;
+  audio.play().then(() => {
+    isPlaying = true;
+    updatePlayState(true);
+  }).catch(e => {
+    // Try without AudioContext for CORS
+    audio.src = STREAM_URL;
+    audio.play().then(() => {
+      isPlaying = true;
+      updatePlayState(true);
+    }).catch(err => {
+      document.getElementById('connStatus').textContent = 'ERRO DE CONEXÃO';
+    });
+  });
+}
+
+function stopPlay() {
+  audio.pause();
+  audio.src = '';
+  isPlaying = false;
+  updatePlayState(false);
+}
+
+function updatePlayState(playing) {
+  const masterBtn = document.getElementById('masterPlayBtn');
+  masterBtn.textContent = playing ? '⏸' : '▶';
+  masterBtn.classList.toggle('playing', playing);
+
+  // Vinyl spin
+  ['A','B'].forEach(d => setDeckSpin(d, playing));
+
+  // Connection status
+  document.getElementById('connDot').className = playing ? 'status-dot' : 'status-dot red';
+  document.getElementById('connStatus').textContent = playing ? 'CONECTADO' : 'DESCONECTADO';
+  document.getElementById('audioState').textContent = playing ? 'REPRODUZINDO' : 'AGUARDANDO';
+
+
+  if (!animFrame && playing) startAnimation();
+}
+
+// ─── DECK CONTROLS ───
+const deckStates = { A: 'stop', B: 'stop' };
+
+function deckPlay(d) {
+  // Pause the other deck visually
+  const other = d === 'A' ? 'B' : 'A';
+  deckStates[other] = 'pause';
+  setDeckSpin(other, false);
+
+  deckStates[d] = 'play';
+  setDeckSpin(d, true);
+
+  // Both decks share the same stream — start if not already playing
+  if (!isPlaying) {
+    startPlay();
+  }
+}
+
+function deckPause(d) {
+  deckStates[d] = 'pause';
+  setDeckSpin(d, false);
+  // Pause audio only if no deck is playing
+  const anyPlaying = Object.values(deckStates).some(s => s === 'play');
+  if (!anyPlaying && isPlaying) {
+    audio.pause();
+    isPlaying = false;
+    updatePlayState(false);
+  }
+}
+
+function deckStop(d) {
+  deckStates[d] = 'stop';
+  setDeckSpin(d, false);
+  // Stop audio only if no deck is playing
+  const anyPlaying = Object.values(deckStates).some(s => s === 'play');
+  if (!anyPlaying && isPlaying) {
+    stopPlay();
+  }
+}
+
+function setDeckSpin(d, active) {
+  const vinyl = document.getElementById('vinyl' + d);
+  const shine = document.getElementById('shine' + d);
+  const arm = document.getElementById('tonearm' + d);
+  if (active) {
+    if (d === 'A') targetSpeedA = 1.5;
+    else targetSpeedB = 1.5;
+    vinyl.style.animationPlayState = 'running';
+    shine.style.animationPlayState = 'running';
+    arm.style.transform = 'rotate(12deg)';
+  } else {
+    if (d === 'A') targetSpeedA = 0;
+    else targetSpeedB = 0;
+    vinyl.style.animationPlayState = 'paused';
+    shine.style.animationPlayState = 'paused';
+    arm.style.transform = 'rotate(0deg)';
+  }
+
+}
+
+// ─── VOLUME ───
+function setVolume(val) {
+  const v = val / 100;
+  if (gainMaster) gainMaster.gain.value = v;
+  else audio.volume = v;
+  document.getElementById('volVal').textContent = val + '%';
+}
+
+// ─── BG CANVAS ───
+const bgCanvas = document.getElementById('bg-canvas');
+const bgCtx = bgCanvas.getContext('2d');
+
+function resizeBg() {
+  bgCanvas.width = window.innerWidth;
+  bgCanvas.height = window.innerHeight;
+}
+resizeBg();
+window.addEventListener('resize', resizeBg);
+
+const particles = [];
+for (let i = 0; i < 60; i++) {
+  particles.push({
+    x: Math.random() * window.innerWidth,
+    y: Math.random() * window.innerHeight,
+    r: Math.random() * 1.5 + 0.3,
+    vx: (Math.random() - 0.5) * 0.3,
+    vy: -(Math.random() * 0.4 + 0.1),
+    color: ['#00d4ff','#bf00ff','#39ff14','#ff003c','#ff6a00','#ff00aa'][Math.floor(Math.random()*6)],
+    alpha: Math.random() * 0.6 + 0.1,
+    life: Math.random()
+  });
+}
+
+const beams = [];
+for (let i = 0; i < 6; i++) {
+  beams.push({
+    x: Math.random() * window.innerWidth,
+    angle: Math.random() * Math.PI * 2,
+    speed: (Math.random() - 0.5) * 0.01,
+    color: ['#00d4ff44','#bf00ff44','#39ff1444','#ff003c44'][Math.floor(Math.random()*4)],
+    width: Math.random() * 80 + 30,
+    len: Math.random() * 300 + 200
+  });
+}
+
+function drawBg(energy) {
+  bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+
+  // Deep gradient
+  const grad = bgCtx.createLinearGradient(0, 0, 0, bgCanvas.height);
+  grad.addColorStop(0, '#020408');
+  grad.addColorStop(0.5, '#040812');
+  grad.addColorStop(1, '#020408');
+  bgCtx.fillStyle = grad;
+  bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+
+  // Festival beams
+  beams.forEach(b => {
+    b.angle += b.speed * (1 + energy * 2);
+    const bGrad = bgCtx.createLinearGradient(
+      b.x, bgCanvas.height,
+      b.x + Math.sin(b.angle) * b.len,
+      bgCanvas.height - Math.cos(b.angle) * b.len
+    );
+    bGrad.addColorStop(0, b.color);
+    bGrad.addColorStop(1, 'transparent');
+    bgCtx.save();
+    bgCtx.translate(b.x, bgCanvas.height);
+    bgCtx.rotate(b.angle);
+    bgCtx.fillStyle = bGrad;
+    bgCtx.fillRect(-b.width/2, -b.len, b.width, b.len);
+    bgCtx.restore();
+  });
+
+  // Particles
+  particles.forEach(p => {
+    p.x += p.vx * (1 + energy);
+    p.y += p.vy * (1 + energy * 2);
+    p.life += 0.003;
+    if (p.y < -10 || p.life > 1) {
+      p.x = Math.random() * bgCanvas.width;
+      p.y = bgCanvas.height + 10;
+      p.life = 0;
+    }
+    const a = Math.sin(p.life * Math.PI) * p.alpha;
+    bgCtx.beginPath();
+    bgCtx.arc(p.x, p.y, p.r * (1 + energy * 2), 0, Math.PI * 2);
+    bgCtx.fillStyle = p.color;
+    bgCtx.globalAlpha = a;
+    bgCtx.fill();
+    bgCtx.globalAlpha = 1;
+  });
+
+  // Grid lines (subtle)
+  bgCtx.strokeStyle = 'rgba(0,212,255,0.04)';
+  bgCtx.lineWidth = 1;
+  const gridSize = 60;
+  for (let gx = 0; gx < bgCanvas.width; gx += gridSize) {
+    bgCtx.beginPath(); bgCtx.moveTo(gx, 0); bgCtx.lineTo(gx, bgCanvas.height); bgCtx.stroke();
+  }
+  for (let gy = 0; gy < bgCanvas.height; gy += gridSize) {
+    bgCtx.beginPath(); bgCtx.moveTo(0, gy); bgCtx.lineTo(bgCanvas.width, gy); bgCtx.stroke();
+  }
+}
+
+// ─── VISUALIZER CANVAS ───
+const vizCanvas = document.getElementById('viz-canvas');
+const vizCtx = vizCanvas.getContext('2d');
+
+function resizeViz() {
+  vizCanvas.width = vizCanvas.offsetWidth;
+  vizCanvas.height = vizCanvas.offsetHeight;
+}
+resizeViz();
+window.addEventListener('resize', resizeViz);
+
+let fakePhase = 0;
+
+function drawViz(data) {
+  const W = vizCanvas.width, H = vizCanvas.height;
+  vizCtx.clearRect(0, 0, W, H);
+
+  // Background
+  vizCtx.fillStyle = 'rgba(0,0,0,0.5)';
+  vizCtx.fillRect(0, 0, W, H);
+
+  // Frequency bars
+  const bars = data ? data.length : 64;
+  const bw = W / bars - 1;
+
+  for (let i = 0; i < bars; i++) {
+    let val;
+    if (data) {
+      val = data[i] / 255;
+    } else {
+      // Fake animation when not playing
+      fakePhase += 0.002;
+      val = (Math.sin(i * 0.3 + fakePhase * 3) * 0.3 + 0.1) * Math.max(0, Math.sin(fakePhase + i * 0.1));
+      val = Math.max(0.02, val);
+    }
+
+    const h = val * H * 0.85;
+    const x = i * (bw + 1);
+
+    // Color based on frequency
+    const hue = 200 + (i / bars) * 160;
+    const alpha = 0.5 + val * 0.5;
+
+    // Glow effect
+    if (val > 0.5) {
+      vizCtx.shadowColor = `hsl(${hue}, 100%, 60%)`;
+      vizCtx.shadowBlur = 10;
+    }
+
+    // Gradient bar
+    const grad = vizCtx.createLinearGradient(0, H - h, 0, H);
+    grad.addColorStop(0, `hsla(${hue}, 100%, 70%, ${alpha})`);
+    grad.addColorStop(0.7, `hsla(${hue - 30}, 90%, 50%, ${alpha * 0.8})`);
+    grad.addColorStop(1, `hsla(${hue - 60}, 80%, 30%, ${alpha * 0.4})`);
+
+    vizCtx.fillStyle = grad;
+    vizCtx.fillRect(x, H - h, bw, h);
+    vizCtx.shadowBlur = 0;
+
+    // Peak indicator
+    if (val > 0.7) {
+      vizCtx.fillStyle = `hsl(${hue}, 100%, 80%)`;
+      vizCtx.fillRect(x, H - h - 3, bw, 2);
+    }
+  }
+
+  // Center line
+  vizCtx.strokeStyle = 'rgba(0,212,255,0.2)';
+  vizCtx.lineWidth = 1;
+  vizCtx.beginPath();
+  vizCtx.moveTo(0, H / 2);
+  vizCtx.lineTo(W, H / 2);
+  vizCtx.stroke();
+}
+
+// ─── VU METER UPDATE ───
+function updateVU(id, level) {
+  const segs = document.querySelectorAll(`#${id} .vu-seg`);
+  const count = segs.length / 2;
+  segs.forEach((seg, i) => {
+    const idx = i % count;
+    const lit = idx < Math.floor(level * count);
+    seg.style.background = lit ? seg.dataset.color : 'rgba(255,255,255,0.05)';
+    seg.style.boxShadow = lit ? `0 0 4px ${seg.dataset.color}` : 'none';
+  });
+}
+
+// ─── LED STRIP UPDATE ───
+function updateLEDStrip(energy) {
+  const leds = document.querySelectorAll('#ledStrip .led');
+  leds.forEach((led, i) => {
+    const active = Math.random() < energy * 1.5 || i < leds.length * energy;
+    led.style.background = active ? led.dataset.color : 'rgba(255,255,255,0.05)';
+    led.style.boxShadow = active ? `0 0 6px ${led.dataset.color}` : 'none';
+  });
+}
+
+// ─── SIDE LED BARS UPDATE ───
+function updateSideBars(energy) {
+  ['ledLeft','ledRight'].forEach(id => {
+    const segs = document.querySelectorAll(`#${id} .led-bar-seg`);
+    segs.forEach((seg, i) => {
+      const phase = (i / segs.length + performance.now() * 0.001) % 1;
+      const glow = (Math.sin(phase * Math.PI * 2) * 0.5 + 0.5) * (0.3 + energy * 0.7);
+      seg.style.opacity = Math.min(1, glow + energy * 0.3);
+    });
+  });
+}
+
+// ─── BPM SIMULATOR ───
+let bpmTick = 0;
+function updateBPM(energy) {
+  bpmTick += energy * 2;
+  const bpm = Math.floor(120 + energy * 40);
+  if (isPlaying) {
+    document.getElementById('bpmA').textContent = 'BPM: ' + bpm;
+    document.getElementById('bpmB').textContent = 'BPM: ' + (bpm + Math.floor(energy * 5));
+  }
+}
+
+// ─── VINYL SPEED REACT TO AUDIO ───
+function updateVinylSpeeds(energy) {
+  if (isPlaying) {
+    const s = 1.5 + energy * 3;
+    targetSpeedA = s;
+    targetSpeedB = s * 0.98;
+    // Update animation-duration based on speed
+    const dur = Math.max(0.3, 2 / s);
+    document.getElementById('vinylA').style.animationDuration = dur + 's';
+    document.getElementById('vinylB').style.animationDuration = (dur * 1.02) + 's';
+    document.getElementById('miniVinyl').style.animationDuration = dur + 's';
+  }
+}
+
+// ─── MAIN ANIMATION LOOP ───
+function startAnimation() {
+  function loop(ts) {
+    animFrame = requestAnimationFrame(loop);
+    let data = null;
+    let energy = 0;
+
+    if (analyser && isPlaying) {
+      analyser.getByteFrequencyData(dataArray);
+      data = dataArray;
+      energy = dataArray.reduce((a,b) => a+b, 0) / (dataArray.length * 255);
+    } else {
+      // Subtle idle animation
+      energy = (Math.sin(ts * 0.001) * 0.5 + 0.5) * 0.15;
+    }
+
+    drawBg(energy);
+    drawViz(data);
+    updateVU('vuA', isPlaying ? energy * 1.2 + Math.random() * 0.1 : 0);
+    updateVU('vuB', isPlaying ? energy * 1.1 + Math.random() * 0.08 : 0);
+    updateLEDStrip(isPlaying ? energy : 0.1);
+    updateSideBars(isPlaying ? energy : 0.05);
+    updateBPM(energy);
+    if (isPlaying) updateVinylSpeeds(energy);
+  }
+  animFrame = requestAnimationFrame(loop);
+}
+
+// Start idle animation immediately
+startAnimation();
+
+// ─── CROSSFADER DRAG ───
+const cfTrack = document.getElementById('crossfaderTrack');
+const cfThumb = document.getElementById('crossfaderThumb');
+const cfFill = document.getElementById('crossfaderFill');
+let cfDragging = false;
+let cfVal = 0.5;
+
+function updateCF(x) {
+  const rect = cfTrack.getBoundingClientRect();
+  cfVal = Math.max(0, Math.min(1, (x - rect.left) / rect.width));
+  cfThumb.style.left = (cfVal * 100) + '%';
+  cfFill.style.width = (cfVal * 100) + '%';
+  // Equal-power crossfade: center = full volume both sides
+  // Left (A): max at 0, silent at 1 — Right (B): silent at 0, max at 1
+  // We use a single stream so we map 0→left cut, 0.5→full, 1→left full again (DJ style)
+  if (cfGain) {
+    // Simple DJ crossfade: 0 = left full, 0.5 = both full, 1 = right full
+    const angle = cfVal * Math.PI / 2; // 0 … π/2
+    // Mix: at center both = 1; at edges one side fades out
+    const gainVal = Math.min(1, Math.sin(angle + Math.PI / 4) * Math.SQRT2);
+    cfGain.gain.setTargetAtTime(Math.max(0.001, gainVal), audioCtx.currentTime, 0.05);
+  }
+}
+
+cfThumb.addEventListener('mousedown', e => { cfDragging = true; e.preventDefault(); });
+document.addEventListener('mousemove', e => { if (cfDragging) updateCF(e.clientX); });
+document.addEventListener('mouseup', () => { cfDragging = false; });
+cfTrack.addEventListener('click', e => updateCF(e.clientX));
+
+// Touch events
+cfThumb.addEventListener('touchstart', e => { cfDragging = true; e.preventDefault(); }, {passive:false});
+document.addEventListener('touchmove', e => { if (cfDragging) updateCF(e.touches[0].clientX); }, {passive:true});
+document.addEventListener('touchend', () => { cfDragging = false; });
+
+// ─── FADER DRAG — with real EQ effect ───
+// val 0→1 maps to dB: center(0.5)=0dB, top(1)=+12dB, bottom(0)=-40dB (kill)
+function faderToDB(val) {
+  if (val < 0.5) return (val / 0.5) * 12 - 12;   // -12 … 0
+  return (val - 0.5) / 0.5 * 12;                  // 0 … +12
+}
+
+function makeFaderDraggable(id, getNode) {
+  const track = document.getElementById(id);
+  const thumb = track.querySelector('.fader-thumb');
+  const fill  = track.querySelector('.fader-fill');
+  let dragging = false;
+  let val = 0.5;
+
+  function update(y) {
+    const rect = track.getBoundingClientRect();
+    val = 1 - Math.max(0, Math.min(1, (y - rect.top) / rect.height));
+    const pct = val * 100;
+    thumb.style.bottom = pct + '%';
+    fill.style.height  = pct + '%';
+    const node = getNode();
+    if (node && audioCtx) {
+      const db = faderToDB(val);
+      node.gain.setTargetAtTime(db, audioCtx.currentTime, 0.03);
+    }
+  }
+
+  thumb.addEventListener('mousedown', e => { dragging = true; e.preventDefault(); });
+  document.addEventListener('mousemove', e => { if (dragging) update(e.clientY); });
+  document.addEventListener('mouseup',   () => { dragging = false; });
+  track.addEventListener('click', e => update(e.clientY));
+  thumb.addEventListener('touchstart', e => { dragging = true; e.preventDefault(); }, {passive:false});
+  document.addEventListener('touchmove', e => { if (dragging) update(e.touches[0].clientY); }, {passive:true});
+  document.addEventListener('touchend',  () => { dragging = false; });
+}
+
+makeFaderDraggable('faderHi',  () => filterHi);
+makeFaderDraggable('faderMid', () => filterMid);
+makeFaderDraggable('faderLo',  () => filterLo);
+
+// ─── KNOB DRAG — with real audio effect ───
+function makeKnobDraggable(id, applyFn) {
+  const knob   = document.getElementById(id);
+  const dot    = knob.querySelector('.knob-dot');
+  const valEl  = knob.nextElementSibling;
+  let dragging = false, startY = 0, startVal = parseFloat(knob.dataset.val);
+  let val = startVal;
+
+  function update(dy) {
+    val = Math.max(0, Math.min(100, startVal - dy * 0.7));
+    const deg = (val / 100) * 270 - 135;
+    dot.style.transform       = `translateX(-50%) rotate(${deg}deg)`;
+    dot.style.transformOrigin = '50% 400%';
+    if (valEl) valEl.textContent = Math.round(val) + '%';
+    knob.dataset.val = val;
+    if (audioCtx) applyFn(val);
+  }
+
+  knob.addEventListener('mousedown', e => {
+    dragging = true;
+    startY   = e.clientY;
+    startVal = parseFloat(knob.dataset.val);
+    e.preventDefault();
+  });
+  document.addEventListener('mousemove', e => { if (dragging) update(e.clientY - startY); });
+  document.addEventListener('mouseup',   () => { dragging = false; });
+  knob.addEventListener('touchstart', e => {
+    dragging = true;
+    startY   = e.touches[0].clientY;
+    startVal = parseFloat(knob.dataset.val);
+    e.preventDefault();
+  }, {passive:false});
+  document.addEventListener('touchmove', e => { if (dragging) update(e.touches[0].clientY - startY); }, {passive:true});
+  document.addEventListener('touchend',  () => { dragging = false; });
+}
+
+// Bass knob: val 0→100 maps to -15dB … +15dB
+makeKnobDraggable('knobBass', val => {
+  if (bassFilter) {
+    const db = (val / 100) * 30 - 15;
+    bassFilter.gain.setTargetAtTime(db, audioCtx.currentTime, 0.05);
+  }
+});
+
+// Gain knob: val 0→100 maps to gain 0 … 1.5
+makeKnobDraggable('knobGain', val => {
+  if (gainNode) {
+    const g = (val / 100) * 1.5;
+    gainNode.gain.setTargetAtTime(g, audioCtx.currentTime, 0.05);
+  }
+});
+
+// ─── AUDIO EVENTS ───
+audio.addEventListener('playing', () => {
+  document.getElementById('connStatus').textContent = 'CONECTADO';
+  document.getElementById('connDot').className = 'status-dot';
+});
+
+audio.addEventListener('error', () => {
+  document.getElementById('connStatus').textContent = 'ERRO DE CONEXÃO';
+  document.getElementById('connDot').className = 'status-dot red';
+  isPlaying = false;
+  updatePlayState(false);
+});
+
+audio.addEventListener('stalled', () => {
+  document.getElementById('audioState').textContent = 'BUFFERING...';
+});
+
+audio.addEventListener('waiting', () => {
+  document.getElementById('audioState').textContent = 'BUFFERING...';
+});
+
+audio.addEventListener('canplay', () => {
+  if (isPlaying) document.getElementById('audioState').textContent = 'REPRODUZINDO';
+});
+</script>
+</body>
+</html>
